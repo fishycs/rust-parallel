@@ -62,12 +62,8 @@ fn pps_sum<T: Zero>(array_ptr: *mut T, tree_ptr: &mut PrefixTree<T>, cores: usiz
 	tree_ptr.left = Some(Box::new(left));
 	tree_ptr.right = Some(Box::new(right));
 
-	let left_ptr: &mut PrefixTree<T>;
-	let right_ptr: &mut PrefixTree<T>;
-	unsafe {
-	    left_ptr = option_box_to_mut_ref(&mut tree_ptr.left);
-	    right_ptr = option_box_to_mut_ref(&mut tree_ptr.right);
-	}
+	let left_ptr: &mut PrefixTree<T> = &mut**(&mut tree_ptr.left).as_mut().unwrap();
+	let right_ptr: &mut PrefixTree<T> = &mut**(&mut tree_ptr.right).as_mut().unwrap();
 
 	let left_cores: usize = cores/2;
 	let right_cores: usize = cores - left_cores;
@@ -108,13 +104,9 @@ fn pps_distribute<T>(array_ptr: *mut T, tree_ptr: &mut PrefixTree<T>) where for<
 	}
     } else {
 	// parallel
-
-	let left_ptr: &mut PrefixTree<T>;
-	let right_ptr: &mut PrefixTree<T>;
-	unsafe {
-	    left_ptr = option_box_to_mut_ref(&mut tree_ptr.left);
-	    right_ptr = option_box_to_mut_ref(&mut tree_ptr.right);
-	}
+	
+	let left_ptr: &mut PrefixTree<T> = &mut**(&mut tree_ptr.left).as_mut().unwrap();
+	let right_ptr: &mut PrefixTree<T> = &mut**(&mut tree_ptr.right).as_mut().unwrap();
 	
 	left_ptr.from_left += &tree_ptr.from_left;
 	right_ptr.from_left += &tree_ptr.from_left;
@@ -132,12 +124,6 @@ fn pps_distribute<T>(array_ptr: *mut T, tree_ptr: &mut PrefixTree<T>) where for<
 	pps_distribute(array_ptr, right_ptr);
 	handle.join().unwrap();
     }
-}
-
-// convert a mutable reference to an option of a box into a mutable reference to the contents of the box
-// unsafe since this method will crash if the option is None
-unsafe fn option_box_to_mut_ref<T>(var: &mut Option<Box<T>>) -> &mut T {
-    return (&mut**var.as_mut().unwrap() as *mut T).as_mut().unwrap();
 }
 
 // run some tests
