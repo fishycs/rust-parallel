@@ -9,6 +9,7 @@ edition = "2018"
 [dependencies]
 num-traits = "0.2"
 num_cpus = "1.0"
+crossbeam = "0.8.0"
 
 [profile.dev]
 opt-level = 3
