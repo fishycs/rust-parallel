@@ -10,7 +10,7 @@ where
     parallel_prefix_sum_tune(array, num_cpus::get(), SEQUENTIAL_THRESHOLD);
 }
 
-// parallel prefix sum (copy)
+// parallel prefix sum (in place)
 pub fn parallel_prefix_sum_tune<T: Send>(array: &mut [T], cores: usize, threshold: usize)
 where
     for<'t> T: AddAssign<&'t T>,
@@ -30,7 +30,7 @@ pub fn parallel_prefix<T: Send, F: Fn(&mut T, &T) + Sync>(array: &mut [T], accum
     parallel_prefix_tune(array, accumulate_fn, num_cpus::get(), SEQUENTIAL_THRESHOLD);
 }
 
-// parallel prefix (copy)
+// parallel prefix (in place)
 pub fn parallel_prefix_tune<T: Send, F: Fn(&mut T, &T) + Sync>(
     array: &mut [T],
     accumulate_fn: &F,
