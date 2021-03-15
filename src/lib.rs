@@ -4,5 +4,5 @@
 
 const SEQUENTIAL_THRESHOLD: usize = 256;
 
-mod prefix;
-mod pack;
+pub mod pack;
+pub mod prefix;
