@@ -39,9 +39,16 @@ pub fn parallel_prefix<T: Send, F: Fn(&mut T, &T) + Sync>(array: &mut [T], accum
 pub fn parallel_prefix_tune<T: Send, F: Fn(&mut T, &T) + Sync>(
     array: &mut [T],
     accumulate_fn: &F,
-    cores: usize,
-    threshold: usize,
+    mut cores: usize,
+    mut threshold: usize,
 ) {
+    if cores == 0 {
+	cores = 1;
+    }
+    if threshold == 0 {
+	threshold = 1;
+    }
+    
     // collect and build sums
     parallel_prefix_accumulate(array, accumulate_fn, cores, threshold);
 
@@ -66,11 +73,11 @@ fn parallel_prefix_accumulate<T: Send, F: Fn(&mut T, &T) + Sync>(
         }
     } else {
         // parallel
-        let left_cores: usize = cores/2;
+        let left_cores: usize = cores / 2;
         let right_cores: usize = cores - left_cores;
 
         // have to split, since each thread requires unique access...
-        let (left, right) = array.split_at_mut(array.len()/2);
+        let (left, right) = array.split_at_mut(array.len() / 2);
 
         crossbeam::scope(|scope| {
             scope.spawn(|_| {
@@ -100,18 +107,18 @@ fn parallel_prefix_distribute<T: Send, F: Fn(&mut T, &T) + Sync>(
         }
     } else {
         // parallel
-        let left_cores: usize = cores/2;
+        let left_cores: usize = cores / 2;
         let right_cores: usize = cores - left_cores;
 
         let left;
         let right;
 
         if start {
-            let (left_array, right_array) = array.split_at_mut((array.len() + 1)/2 - 1);
+            let (left_array, right_array) = array.split_at_mut((array.len() + 1) / 2 - 1);
             left = left_array;
             right = right_array;
         } else {
-            let (left_array, right_array) = array.split_at_mut(array.len()/2);
+            let (left_array, right_array) = array.split_at_mut(array.len() / 2);
             left = left_array;
             right = right_array;
 
@@ -135,13 +142,14 @@ mod tests {
     use std::time::Instant;
 
     const N: usize = 10000000;
+    const K: usize = 20;
 
     #[test]
     fn test_parallel_prefix_sum_small() {
-        let mut arr = [1; 20];
+        let mut arr = [1; K];
         parallel_prefix_sum::<u128>(&mut arr);
-        let mut expected = [0; 20];
-        for i in 0..20 {
+        let mut expected = [0; K];
+        for i in 0..K {
             expected[i] = (i as u128) + 1;
         }
         assert_eq!(expected, arr);
@@ -154,7 +162,7 @@ mod tests {
         let mut par: Vec<u128> = Vec::new();
         for i in 0..N {
             let i: u128 = i as u128;
-            par.push(64 + i*i - 8*i + 5);
+            par.push(64 + i * i - 8 * i + 5);
         }
         let mut seq: Vec<u128> = par.clone();
 
