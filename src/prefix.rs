@@ -3,19 +3,19 @@ use std::ops::AddAssign;
 use super::SEQUENTIAL_THRESHOLD;
 
 // parallel prefix sum (in place)
-pub fn parallel_prefix_sum<T: Send>(array: &mut [T])
+pub fn sum<T: Send>(array: &mut [T])
 where
     for<'t> T: AddAssign<&'t T>,
 {
-    parallel_prefix_sum_tune(array, num_cpus::get(), SEQUENTIAL_THRESHOLD);
+    sum_tune(array, num_cpus::get(), SEQUENTIAL_THRESHOLD);
 }
 
-// parallel prefix sum (copy)
-pub fn parallel_prefix_sum_tune<T: Send>(array: &mut [T], cores: usize, threshold: usize)
+// parallel prefix sum (in place)
+pub fn sum_tune<T: Send>(array: &mut [T], cores: usize, threshold: usize)
 where
     for<'t> T: AddAssign<&'t T>,
 {
-    parallel_prefix_tune(
+    accumulate_tune(
         array,
         &|a: &mut T, b: &T| {
             *a += b;
@@ -26,12 +26,12 @@ where
 }
 
 // parallel prefix (in place)
-pub fn parallel_prefix<T: Send, F: Fn(&mut T, &T) + Sync>(array: &mut [T], accumulate_fn: &F) {
-    parallel_prefix_tune(array, accumulate_fn, num_cpus::get(), SEQUENTIAL_THRESHOLD);
+pub fn accumulate<T: Send, F: Fn(&mut T, &T) + Sync>(array: &mut [T], accumulate_fn: &F) {
+    accumulate_tune(array, accumulate_fn, num_cpus::get(), SEQUENTIAL_THRESHOLD);
 }
 
-// parallel prefix (copy)
-pub fn parallel_prefix_tune<T: Send, F: Fn(&mut T, &T) + Sync>(
+// parallel prefix (in place)
+pub fn accumulate_tune<T: Send, F: Fn(&mut T, &T) + Sync>(
     array: &mut [T],
     accumulate_fn: &F,
     mut cores: usize,
@@ -133,7 +133,7 @@ fn parallel_prefix_distribute<T: Send, F: Fn(&mut T, &T) + Sync>(
 // run some tests
 #[cfg(test)]
 mod tests {
-    use crate::prefix::parallel_prefix_sum;
+    use crate::prefix::sum;
     use std::time::Instant;
 
     const N: usize = 10000000;
@@ -142,7 +142,7 @@ mod tests {
     #[test]
     fn test_parallel_prefix_sum_small() {
         let mut arr = [1; K];
-        parallel_prefix_sum::<u128>(&mut arr);
+        sum::<u128>(&mut arr);
         let mut expected = [0; K];
         for i in 0..K {
             expected[i] = (i as u128) + 1;
@@ -157,13 +157,13 @@ mod tests {
         let mut par: Vec<u128> = Vec::new();
         for i in 0..N {
             let i: u128 = i as u128;
-            par.push(64 + i * i - 8 * i + 5);
+            par.push(64 + i*i - 8*i + 5);
         }
         let mut seq: Vec<u128> = par.clone();
 
         // time parallel algorithm
         let start_par = Instant::now();
-        parallel_prefix_sum::<u128>(&mut par[..]);
+        sum::<u128>(&mut par[..]);
         let dur_par = start_par.elapsed();
 
         // time sequential algorithm
@@ -177,6 +177,6 @@ mod tests {
         assert_eq!(seq, par);
 
         // print results
-        println!("parallel = {:?}, sequential = {:?}", dur_par, dur_seq);
+        println!(">>> PREFIX: parallel_prefix_sum = {:?}, sequential_prefix_sum = {:?}, len = {}", dur_par, dur_seq, N);
     }
 }
