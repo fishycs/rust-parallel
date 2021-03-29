@@ -1,10 +1,13 @@
 // implementation of common parallel algorithms in rust
-// - parallel prefix (e.g. sum)
-// - parallel pack (coming soon)
+// - parallel prefix/sum
+// - parallel pack
 // - parallel map (coming soon)
+// - parallel reduce (coming soon)
 
-const SEQUENTIAL_THRESHOLD: usize = 256;
+const SEQ_THRESHOLD: usize = 256;
 
-mod prefix;
-mod pack;
-mod map;
+pub mod map;
+pub mod pack;
+pub mod prefix;
+pub mod reduce;
+mod utils;
