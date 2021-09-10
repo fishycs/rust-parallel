@@ -1,21 +1,22 @@
-use super::SEQUENTIAL_THRESHOLD;
+use super::SEQ_THRESHOLD;
 use num_cpus;
 use std::ops::AddAssign;
 
 // parallel prefix sum (in place)
-pub fn parallel_prefix_sum<T: Send>(array: &mut [T])
+pub fn sum<T: Send>(array: &mut [T])
 where
     for<'t> T: AddAssign<&'t T>,
 {
-    parallel_prefix_sum_tune(array, num_cpus::get(), SEQUENTIAL_THRESHOLD);
+    sum_tune(array, num_cpus::get(), SEQ_THRESHOLD);
 }
 
 // parallel prefix sum (in place)
-pub fn parallel_prefix_sum_tune<T: Send>(array: &mut [T], threads: usize, seq_threshold: usize)
+pub fn sum_tune<T>(array: &mut [T], threads: usize, seq_threshold: usize)
 where
+    T: Send,
     for<'t> T: AddAssign<&'t T>,
 {
-    parallel_prefix_tune(
+    accumulate_tune(
         array,
         &|a: &mut T, b: &T| {
             *a += b;
@@ -26,17 +27,20 @@ where
 }
 
 // parallel prefix (in place)
-pub fn parallel_prefix<T: Send, F: Fn(&mut T, &T) + Sync>(array: &mut [T], accumulate_fn: &F) {
-    parallel_prefix_tune(array, accumulate_fn, num_cpus::get(), SEQUENTIAL_THRESHOLD);
+pub fn accumulate<T, F>(array: &mut [T], accumulate_fn: &F)
+where
+    T: Send,
+    F: Fn(&mut T, &T) + Sync,
+{
+    accumulate_tune(array, accumulate_fn, num_cpus::get(), SEQ_THRESHOLD);
 }
 
 // parallel prefix (in place)
-pub fn parallel_prefix_tune<T: Send, F: Fn(&mut T, &T) + Sync>(
-    array: &mut [T],
-    accumulate_fn: &F,
-    threads: usize,
-    seq_threshold: usize,
-) {
+pub fn accumulate_tune<T, F>(array: &mut [T], accumulate_fn: &F, threads: usize, seq_threshold: usize)
+where
+    T: Send,
+    F: Fn(&mut T, &T) + Sync,
+{
     if threads == 0 {
         panic!("threads cannot be zero!");
     }
@@ -49,13 +53,7 @@ pub fn parallel_prefix_tune<T: Send, F: Fn(&mut T, &T) + Sync>(
 
     // finalize and distribute sums
     let len: usize = array.len() - 1;
-    parallel_prefix_distribute(
-        &mut array[..len],
-        accumulate_fn,
-        threads,
-        seq_threshold,
-        true,
-    );
+    parallel_prefix_distribute(&mut array[..len], accumulate_fn, threads, seq_threshold, true);
 }
 
 // collect and build sums
@@ -139,10 +137,12 @@ fn parallel_prefix_distribute<T: Send, F: Fn(&mut T, &T) + Sync>(
 // run some tests
 #[cfg(test)]
 mod tests {
+
     use crate::prefix::*;
     use std::time::Instant;
 
     const N: usize = 10000000;
+
     // test parallel prefix sum algorithm with a large set of random data
     #[test]
     fn test_parallel_prefix_sum() {
@@ -156,7 +156,7 @@ mod tests {
 
         // time parallel algorithm
         let start_par = Instant::now();
-        parallel_prefix_sum(&mut par[..]);
+        sum(&mut par[..]);
         let dur_par = start_par.elapsed();
 
         // time sequential algorithm
@@ -170,7 +170,10 @@ mod tests {
         assert_eq!(seq, par);
 
         // print results
-        println!("parallel = {:?}, sequential = {:?}", dur_par, dur_seq);
+        println!(
+            ">>> PREFIX: parallel_prefix_sum = {:?}, sequential_prefix_sum = {:?}, len = {}",
+            dur_par, dur_seq, N
+        );
     }
 
     const K: usize = 100;
@@ -178,7 +181,7 @@ mod tests {
     #[test]
     fn test_parallel_prefix_sum_full_seq() {
         let mut arr = [1usize; K];
-        parallel_prefix_sum_tune(&mut arr, 1, usize::MAX);
+        sum_tune(&mut arr, 1, usize::MAX);
         let mut expected = [0; K];
         for i in 0..K {
             expected[i] = i + 1;
@@ -190,7 +193,7 @@ mod tests {
     #[test]
     fn test_parallel_prefix_sum_full_par() {
         let mut arr = [1usize; K];
-        parallel_prefix_sum_tune(&mut arr, usize::MAX, 1);
+        sum_tune(&mut arr, usize::MAX, 1);
         let mut expected = [0; K];
         for i in 0..K {
             expected[i] = i + 1;
@@ -203,19 +206,19 @@ mod tests {
     #[should_panic]
     fn test_parallel_prefix_sum_bad_args_1() {
         let mut arr = [0; 0];
-        parallel_prefix_sum_tune(&mut arr, 0, 1);
+        sum_tune(&mut arr, 0, 1);
     }
     #[test]
     #[should_panic]
     fn test_parallel_prefix_sum_bad_args_2() {
         let mut arr = [0; 0];
-        parallel_prefix_sum_tune(&mut arr, 0, 0);
+        sum_tune(&mut arr, 0, 0);
     }
     #[test]
     #[should_panic]
     fn test_parallel_prefix_sum_bad_args_3() {
         let mut arr = [0; 0];
-        parallel_prefix_sum_tune(&mut arr, 1, 0);
+        sum_tune(&mut arr, 1, 0);
     }
 
     const J: usize = 20;
@@ -226,7 +229,7 @@ mod tests {
         let accumulate_fn = &|a: &mut usize, b: &usize| {
             *a *= b;
         };
-        parallel_prefix_tune(&mut arr, accumulate_fn, 10, 2);
+        accumulate_tune(&mut arr, accumulate_fn, 10, 2);
         let mut expected = [0; J];
         let mut product = 1;
         for i in 0..J {
